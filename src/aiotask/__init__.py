@@ -245,7 +245,7 @@ async def log(value: str = "", end="\n") -> None:
     """Add log to task info."""
     try:
         task_id = _task_id.get()
-    except TimeoutError:
+    except LookupError:
         return
     state = _get_state()
     task_info = state.task_infos[task_id]
@@ -265,7 +265,27 @@ async def get_task_id(task: asyncio.Task, timeout: float = 1) -> int:
 def get_task_info(task_id: int) -> TaskInfo:
     """Get the task info from a task_id."""
     loop = asyncio.get_running_loop()
-    return _loop_states[loop].task_infos[task_id]
+    try:
+        return _loop_states[loop].task_infos[task_id]
+    except KeyError:
+        msg = f"No task with id {task_id!r} found in the current event loop."
+        raise ValueError(msg) from None
+
+
+def remove_task(task_id: int) -> None:
+    """Remove a task and all its descendants from tracking to free memory."""
+    loop = asyncio.get_running_loop()
+    state = _loop_states[loop]
+    try:
+        task_info = state.task_infos[task_id]
+    except KeyError:
+        msg = f"No task with id {task_id!r} found in the current event loop."
+        raise ValueError(msg) from None
+    for child_id in task_info.children:
+        if child_id in state.task_infos:
+            remove_task(child_id)
+    del state.task_infos[task_id]
+    state.task_ids.pop(task_info.task, None)
 
 
 def track_task[**P, R](
@@ -384,5 +404,7 @@ __all__ = [
     "log",
     "make_async",
     "make_async_generator",
+    "remove_task",
+    "track_task",
     "wait_for",
 ]
