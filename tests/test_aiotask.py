@@ -1,4 +1,4 @@
-"""Unit tests for aiotask – asyncio task tracking library."""
+"""Unit tests for aiotask - asyncio task tracking library."""
 
 import asyncio
 from typing import Any
@@ -13,9 +13,9 @@ from aiotask import (
     log,
     make_async,
     make_async_generator,
+    track_task,  # not in __all__ but part of the public surface
     wait_for,
 )
-from aiotask import track_task  # not in __all__ but part of the public surface
 
 
 def _current_task() -> asyncio.Task[Any]:
@@ -37,7 +37,7 @@ async def _flush() -> None:
 
 
 # ---------------------------------------------------------------------------
-# TaskInfo – immutability guard
+# TaskInfo - immutability guard
 # ---------------------------------------------------------------------------
 
 
@@ -72,13 +72,13 @@ class TestTaskInfoImmutability:
             task_id = await get_task_id(_current_task())
             info = get_task_info(task_id)
             # Should not raise
-            info._edit_allowed = info._edit_allowed  # noqa: SLF001
+            info._edit_allowed = info._edit_allowed
 
         await asyncio.create_task(track_task(coro)())
 
 
 # ---------------------------------------------------------------------------
-# TaskInfo – helper methods
+# TaskInfo - helper methods
 # ---------------------------------------------------------------------------
 
 
@@ -264,7 +264,7 @@ class TestTrackTask:
         async def coro() -> None:
             # _init_task_info is called once by the wrapper; calling it again
             # via a second track_task wrapper should raise.
-            from aiotask import _init_task_info  # noqa: PLC0415
+            from aiotask import _init_task_info
 
             with pytest.raises(RuntimeError, match="already initialized"):
                 await _init_task_info()
@@ -284,7 +284,7 @@ class TestTrackTask:
 
 
 # ---------------------------------------------------------------------------
-# Parent–child relationships
+# Parent-child relationships
 # ---------------------------------------------------------------------------
 
 
@@ -531,7 +531,7 @@ class TestMakeAsync:
         def my_func() -> None:
             pass
 
-        assert getattr(make_async(my_func), "__name__") == "my_func"
+        assert make_async(my_func).__name__ == "my_func"  # ty: ignore[unresolved-attribute]
 
     async def test_sync_exception_propagates(self) -> None:
         def bad() -> None:

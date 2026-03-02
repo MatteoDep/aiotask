@@ -61,7 +61,7 @@ class TaskInfo:
 
     def children_info(
         self,
-        fmt: Callable[["TaskInfo"], str] = "- {0.description}: {0.status.value}".format,
+        fmt: Callable[[TaskInfo], str] = "- {0.description}: {0.status.value}".format,
         sep: str = "\n",
         all_children=False,
     ) -> str:
@@ -100,9 +100,7 @@ class _LoopState:
             return task_id
 
 
-_loop_states: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, _LoopState] = (
-    weakref.WeakKeyDictionary()
-)
+_loop_states: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, _LoopState] = weakref.WeakKeyDictionary()
 
 
 def _get_state() -> _LoopState:
@@ -291,11 +289,12 @@ def wait_for[**P, R](
 ) -> Callable[P, Coroutine[Any, Any, R]]:
     """Wait for awaitables (e.g. other tasks) and then run the function.
 
-    You can choose to track setting `track=True` and to start before running the wrapped function setting `start=True`.
-    Notice that if you are chaining multiple `wait_for` or `inject` you should start only on the first wrap and track
-    only on the last wrap.
+    You can choose to track setting `track=True` and to start before running the wrapped
+    function setting `start=True`. Notice that if you are chaining multiple `wait_for` or
+    `inject` you should start only on the first wrap and track only on the last wrap.
     For example:
-    `task = asyncio.create_task(wait_for(inject(my_func, dep, start=True), *awaitables, track=True)(*other_args)`
+    `task = asyncio.create_task(
+        wait_for(inject(my_func, dep, start=True), *awaitables, track=True)(*other_args)`
     """
 
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
@@ -322,11 +321,12 @@ def inject[**P, T, R](
 ) -> Callable[P, Coroutine[Any, Any, R]]:
     """Inject awaitables (e.g. other tasks) or simple variables and then run the function.
 
-    You can choose to track setting `track=True` and to start before running the wrapped function setting `start=True`.
-    Notice that if you are chaining multiple `wait_for` or `inject` you should start only on the first wrap and track
-    only on the last wrap.
+    You can choose to track setting `track=True` and to start before running the wrapped
+    function setting `start=True`. Notice that if you are chaining multiple `wait_for` or
+    `inject` you should start only on the first wrap and track only on the last wrap.
     For example:
-    `task = asyncio.create_task(wait_for(inject(my_func, dep, start=True), *awaitables, track=True)(*other_args)`
+    `task = asyncio.create_task(
+        wait_for(inject(my_func, dep, start=True), *awaitables, track=True)(*other_args)`
     """
 
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:

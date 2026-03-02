@@ -17,8 +17,27 @@ build-backend = "uv_build"
 dev = [
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
+    "ruff>=0.15.4",
     "ty>=0.0.19",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "RUF", # ruff-specific rules
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # allow assert in tests
