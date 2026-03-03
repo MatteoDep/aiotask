@@ -11,6 +11,8 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Concatenate, Protocol, cast, runtime_checkable
 
+from ._awaitify import awaitify
+
 
 class TaskStatus(StrEnum):
     WAITING = "waiting to start"
@@ -399,6 +401,7 @@ async def make_async_generator[T](gen: SupportsNext[T]) -> AsyncGenerator[T]:
 
 __all__ = [
     "TaskInfo",
+    "awaitify",
     "get_task_id",
     "get_task_info",
     "inject",

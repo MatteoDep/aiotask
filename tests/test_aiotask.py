@@ -7,6 +7,7 @@ import pytest
 
 from aiotask import (
     TaskStatus,
+    awaitify,
     get_task_id,
     get_task_info,
     inject,
@@ -721,3 +722,70 @@ class TestRemoveTask:
         # Parent info must still be accessible
         info = get_task_info(parent_id)
         assert info.id == parent_id
+
+
+# ---------------------------------------------------------------------------
+# awaitify
+# ---------------------------------------------------------------------------
+
+
+class TestAwaitify:
+    async def test_awaitify_plain_args(self) -> None:
+        """All plain values passed to a sync function."""
+
+        def add(x: int, y: int) -> int:
+            return x + y
+
+        result = await awaitify(add)(1, 2)
+        assert result == 3
+
+    async def test_awaitify_awaitable_args(self) -> None:
+        """All args are Futures/coroutines — should be resolved before calling."""
+
+        def add(x: int, y: int) -> int:
+            return x + y
+
+        loop = asyncio.get_event_loop()
+        fx: asyncio.Future[int] = loop.create_future()
+        fy: asyncio.Future[int] = loop.create_future()
+        fx.set_result(10)
+        fy.set_result(20)
+
+        result = await awaitify(add)(fx, fy)
+        assert result == 30
+
+    async def test_awaitify_mixed_args(self) -> None:
+        """Mix of plain and awaitable positional args."""
+
+        def multiply(x: int, y: int) -> int:
+            return x * y
+
+        loop = asyncio.get_event_loop()
+        fx: asyncio.Future[int] = loop.create_future()
+        fx.set_result(5)
+
+        result = await awaitify(multiply)(fx, 4)
+        assert result == 20
+
+    async def test_awaitify_async_func(self) -> None:
+        """Wrapping an async function — return value is awaited transparently."""
+
+        async def fetch(value: int) -> int:
+            await asyncio.sleep(0)
+            return value * 2
+
+        result = await awaitify(fetch)(7)
+        assert result == 14
+
+    async def test_awaitify_kwargs(self) -> None:
+        """Keyword arguments — both plain and awaitable — are resolved."""
+
+        def greet(name: str, greeting: str = "Hello") -> str:
+            return f"{greeting}, {name}!"
+
+        loop = asyncio.get_event_loop()
+        name_fut: asyncio.Future[str] = loop.create_future()
+        name_fut.set_result("world")
+
+        result = await awaitify(greet)(name=name_fut, greeting="Hi")
+        assert result == "Hi, world!"
