@@ -14,7 +14,6 @@ def render_rich(graph: TaskGraph) -> str:
     from rich.console import Console
     from rich.table import Table
 
-    from aiotask import TaskStatus
     from aiotask._render import _fmt_duration, _progress_bar
 
     _STATUS_STYLE: dict[str, str] = {
@@ -32,7 +31,18 @@ def render_rich(graph: TaskGraph) -> str:
     table.add_column("Time", justify="right")
 
     nodes = graph.nodes()
-    for info in nodes:
+
+    if graph._root_id is not None:
+        root_list = [n for n in nodes if n.id == graph._root_id]
+        children = [n for n in nodes if n.id != graph._root_id]
+        ordered = [(root_list[0], "")] if root_list else []
+        for i, n in enumerate(children):
+            prefix = "└─ " if i == len(children) - 1 else "├─ "
+            ordered.append((n, prefix))
+    else:
+        ordered = [(n, "") for n in nodes]
+
+    for info, prefix in ordered:
         status_val = info.status.value
         style = _STATUS_STYLE.get(status_val, "")
         bar = _progress_bar(info.completed, info.total)
@@ -40,20 +50,8 @@ def render_rich(graph: TaskGraph) -> str:
         progress = f"{bar}  ({int(info.completed)}/{total_str})"
         duration = _fmt_duration(info)
 
-        name = info.description
-        if info.deps:
-            dep_names: list[str] = []
-            for dep_id in info.deps:
-                try:
-                    dep_info = graph.node(dep_id)
-                    dep_names.append(dep_info.description)
-                except Exception:
-                    pass
-            if dep_names:
-                name = f"{name} ← {', '.join(dep_names)}"
-
         table.add_row(
-            name,
+            f"{prefix}{info.description}",
             f"[{style}]{status_val}[/{style}]",
             progress,
             duration,

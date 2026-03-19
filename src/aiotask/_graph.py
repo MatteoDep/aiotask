@@ -93,8 +93,6 @@ class TaskGraph:
 
     def summary(self) -> dict[TaskStatus, int]:
         """Count of nodes per status."""
-        from aiotask import TaskStatus
-
         counts: dict[TaskStatus, int] = {}
         for n in self.nodes():
             counts[n.status] = counts.get(n.status, 0) + 1

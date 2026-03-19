@@ -51,6 +51,10 @@ async def load(validated: list[int], enriched: list[int]) -> int:
     return len(merged)
 
 
+def summarize(count: int) -> str:
+    return f"Pipeline complete: {count} records processed"
+
+
 async def pipeline() -> None:
     async with asyncio.TaskGroup() as tg:
         fetch = tg.create_task(
@@ -69,9 +73,14 @@ async def pipeline() -> None:
             aiotask.node(transform, deps=[valid])(valid),
             name="transform",
         )
-        tg.create_task(
+        loaded = tg.create_task(
             aiotask.node(load, deps=[transformed, enriched])(transformed, enriched),
             name="load",
+        )
+        # sync function — node wraps it transparently
+        tg.create_task(
+            aiotask.node(summarize, deps=[loaded])(loaded),
+            name="summarize",
         )
 
 
@@ -80,7 +89,7 @@ async def main() -> None:
     root_id = await aiotask.get_node_id(root)
     graph = aiotask.TaskGraph(root_id=root_id)
 
-    await aiotask.watch(graph, interval=0.3)
+    await aiotask.watch(graph, interval=0.3, renderer=aiotask.render_text)
     await root
 
     # Post-run graph inspection
@@ -96,6 +105,13 @@ async def main() -> None:
     load_id = next(n.id for n in graph.nodes() if n.description == "load")
     for info in graph.upstream(load_id):
         print(f"  {info.description}")
+
+    print("\n── Upstream of root ────────────────────")
+    for info in graph.upstream(root_id):
+        print(f"  {info.description}")
+    root_info = aiotask.get_node(root_id)
+    print(f"  root.deps: {root_info.deps}")
+    print(f"  root.dependents: {root_info.dependents}")
 
 
 asyncio.run(main())
