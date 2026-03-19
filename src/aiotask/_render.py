@@ -113,9 +113,9 @@ def render_text(graph: TaskGraph, config: RenderConfig | None = None) -> str:
 
     lines: list[str] = []
 
-    if graph._root_id is not None:
-        root_list = [n for n in nodes if n.id == graph._root_id]
-        rest = [n for n in nodes if n.id != graph._root_id]
+    if graph.root_id is not None:
+        root_list = [n for n in nodes if n.id == graph.root_id]
+        rest = [n for n in nodes if n.id != graph.root_id]
         if root_list:
             lines.append(_fmt_node(root_list[0], graph, use_color=use_color, config=config))
             if rest:

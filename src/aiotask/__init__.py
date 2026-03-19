@@ -74,10 +74,10 @@ class TaskInfo:
         self,
         fmt: Callable[[TaskInfo], str] = "- {0.description}: {0.status.value}".format,
         sep: str = "\n",
-        all_children=False,
+        all_children: bool = False,
     ) -> str:
         return sep.join(
-            [fmt(get_node(child_id)) for child_id in (self.children if all_children else self.running_children)]
+            [fmt(get_task(child_id)) for child_id in (self.children if all_children else self.running_children)]
         )
 
     def started(self) -> bool:
@@ -181,10 +181,13 @@ def _add_update_parent_callback(
 
 def _get_task() -> asyncio.Task:
     try:
-        task = cast("asyncio.Task", asyncio.current_task())
+        task = asyncio.current_task()
     except RuntimeError as e:
         msg = "This function can only be called from a coroutine."
         raise RuntimeError(msg) from e
+    if task is None:
+        msg = "No current task. This function must be called from within an asyncio task, not a callback."
+        raise RuntimeError(msg)
     return task
 
 
@@ -252,8 +255,10 @@ async def _start_task() -> None:
         task_info._start_mono = time.monotonic()
         task_info.started_at = datetime.now()
         task_info.status = TaskStatus.RUNNING
-        if task_info.parent is not None:
-            state.task_infos[task_info.parent].running_children.append(task_id)
+    if task_info.parent is not None:
+        parent_info = state.task_infos[task_info.parent]
+        async with parent_info.allow_edit():
+            parent_info.running_children.append(task_id)
 
 
 async def _register_dep(from_id: int, to_id: int) -> None:
@@ -274,7 +279,7 @@ async def _register_dep(from_id: int, to_id: int) -> None:
             to_info.dependents.append(from_id)
 
 
-async def log(value: str = "", end="\n") -> None:
+async def log(value: str = "", end: str = "\n") -> None:
     """Add log to task info."""
     try:
         task_id = _task_id.get()
@@ -286,8 +291,8 @@ async def log(value: str = "", end="\n") -> None:
         task_info.logs += value + end
 
 
-async def get_node_id(task: asyncio.Task, timeout: float = 1) -> int:
-    """Get the node_id associated with a task."""
+async def get_task_id(task: asyncio.Task, timeout: float = 1) -> int:
+    """Get the task_id associated with an asyncio task."""
     state = _get_state()
     async with asyncio.timeout(timeout):
         while task not in state.task_ids:
@@ -295,7 +300,7 @@ async def get_node_id(task: asyncio.Task, timeout: float = 1) -> int:
         return state.task_ids[task]
 
 
-def get_node(task_id: int) -> TaskInfo:
+def get_task(task_id: int) -> TaskInfo:
     """Get the task info from a task_id."""
     loop = asyncio.get_running_loop()
     try:
@@ -305,8 +310,8 @@ def get_node(task_id: int) -> TaskInfo:
         raise ValueError(msg) from None
 
 
-def remove_node(task_id: int) -> None:
-    """Remove a node and all its descendants from tracking to free memory."""
+def remove_task(task_id: int) -> None:
+    """Remove a task and all its descendants from tracking to free memory."""
     loop = asyncio.get_running_loop()
     state = _loop_states[loop]
     if task_id not in state.task_infos:
@@ -328,6 +333,7 @@ def track[**P, R](
 ) -> Callable[P, Coroutine[Any, Any, R]]:
     """Track a coroutine by recording task info."""
 
+    @functools.wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         await _init_task_info(start=start)
         return await func(*args, **kwargs)
@@ -372,14 +378,14 @@ __all__ = [
     "TaskGraph",
     "TaskInfo",
     "TaskStatus",
-    "get_node",
-    "get_node_id",
     "get_render",
+    "get_task",
+    "get_task_id",
     "log",
     "make_async",
     "make_async_generator",
     "node",
-    "remove_node",
+    "remove_task",
     "track",
     "watch",
 ]

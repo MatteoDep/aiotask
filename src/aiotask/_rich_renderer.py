@@ -38,9 +38,9 @@ def render_rich(graph: TaskGraph, config: RenderConfig | None = None) -> str:
 
     nodes = graph.nodes()
 
-    if graph._root_id is not None:
-        root_list = [n for n in nodes if n.id == graph._root_id]
-        children = [n for n in nodes if n.id != graph._root_id]
+    if graph.root_id is not None:
+        root_list = [n for n in nodes if n.id == graph.root_id]
+        children = [n for n in nodes if n.id != graph.root_id]
         ordered = [(root_list[0], "")] if root_list else []
         for i, n in enumerate(children):
             prefix = "└─ " if i == len(children) - 1 else "├─ "

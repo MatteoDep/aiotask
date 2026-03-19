@@ -86,7 +86,7 @@ async def pipeline() -> None:
 
 async def main() -> None:
     root = asyncio.create_task(aiotask.track(pipeline)(), name="ETL Pipeline")
-    root_id = await aiotask.get_node_id(root)
+    root_id = await aiotask.get_task_id(root)
     graph = aiotask.TaskGraph(root_id=root_id)
 
     await aiotask.watch(graph, interval=0.3, renderer=aiotask.get_render(rich=False))

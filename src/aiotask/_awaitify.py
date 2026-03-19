@@ -1,10 +1,12 @@
 import asyncio
+import functools
 import inspect
 from collections.abc import Awaitable, Sequence
 from typing import Any
 
 
 def node(func: Any, /, deps: Sequence[Awaitable] | None = None, track: bool = True, auto_progress: bool = True) -> Any:
+    @functools.wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
         if track:
             from aiotask import _init_task_info, _start_task

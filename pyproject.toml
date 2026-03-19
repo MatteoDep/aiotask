@@ -1,7 +1,7 @@
 [project]
 name = "aiotask"
 version = "0.1.0"
-description = "Add your description here"
+description = "Lightweight asyncio task tracking with dependency graphs and progress rendering"
 readme = "README.md"
 authors = [
     { name = "Matteo De Pellegrin", email = "matteo.dep97@gmail.com" }

@@ -11,6 +11,10 @@ class TaskGraph:
     def __init__(self, root_id: int | None = None) -> None:
         self._root_id = root_id
 
+    @property
+    def root_id(self) -> int | None:
+        return self._root_id
+
     def _state(self) -> _LoopState:
         from aiotask import _get_state
 
@@ -41,9 +45,9 @@ class TaskGraph:
         return sorted(infos, key=lambda x: (x.depth, x.id))
 
     def node(self, task_id: int) -> TaskInfo:
-        from aiotask import get_node
+        from aiotask import get_task
 
-        return get_node(task_id)
+        return get_task(task_id)
 
     def roots(self) -> list[TaskInfo]:
         """Nodes with no deps (no upstream edges)."""
