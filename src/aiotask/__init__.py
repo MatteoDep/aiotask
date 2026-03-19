@@ -10,7 +10,11 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Concatenate, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Any, Concatenate, Protocol, cast, runtime_checkable
+
+if TYPE_CHECKING:
+    from aiotask._graph import TaskGraph
+    from aiotask._render import render, render_text, watch
 
 from ._awaitify import node
 
