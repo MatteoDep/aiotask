@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Concatenate, Protocol, cast, runtime_chec
 
 if TYPE_CHECKING:
     from aiotask._graph import TaskGraph
-    from aiotask._render import render, render_text, watch
+    from aiotask._render import RenderConfig, get_render, watch
 
 from ._awaitify import node
 
@@ -432,18 +432,18 @@ async def make_async_generator[T](gen: SupportsNext[T]) -> AsyncGenerator[T]:
 
 
 __all__ = [
+    "RenderConfig",
     "TaskGraph",
     "TaskInfo",
     "TaskStatus",
     "get_node",
     "get_node_id",
+    "get_render",
     "log",
     "make_async",
     "make_async_generator",
     "node",
     "remove_node",
-    "render",
-    "render_text",
     "track",
     "watch",
 ]
@@ -454,7 +454,7 @@ def __getattr__(name: str) -> object:
         from aiotask._graph import TaskGraph as _TaskGraph
 
         return _TaskGraph
-    if name in ("render_text", "render", "watch"):
+    if name in ("get_render", "RenderConfig", "watch"):
         import aiotask._render as _render
 
         return getattr(_render, name)

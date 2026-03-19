@@ -89,7 +89,7 @@ async def main() -> None:
     root_id = await aiotask.get_node_id(root)
     graph = aiotask.TaskGraph(root_id=root_id)
 
-    await aiotask.watch(graph, interval=0.3, renderer=aiotask.render_text)
+    await aiotask.watch(graph, interval=0.3, renderer=aiotask.get_render(rich=False))
     await root
 
     # Post-run graph inspection
@@ -105,13 +105,5 @@ async def main() -> None:
     load_id = next(n.id for n in graph.nodes() if n.description == "load")
     for info in graph.upstream(load_id):
         print(f"  {info.description}")
-
-    print("\n── Upstream of root ────────────────────")
-    for info in graph.upstream(root_id):
-        print(f"  {info.description}")
-    root_info = aiotask.get_node(root_id)
-    print(f"  root.deps: {root_info.deps}")
-    print(f"  root.dependents: {root_info.dependents}")
-
 
 asyncio.run(main())
