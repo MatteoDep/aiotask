@@ -34,7 +34,10 @@ def make_return_type(awaitable_params: str) -> str:
     )
 
 
-EXTRA_PARAMS = "    /,\n    deps: Sequence[Awaitable[Any]] = ...,\n    track: bool = ...,\n    auto_progress: bool = ...,\n"
+EXTRA_PARAMS = (
+    "    /,\n    deps: Sequence[Awaitable[Any]] = ...,\n"
+    "    track: bool = ...,\n    auto_progress: bool = ...,\n"
+)
 
 
 def generate() -> str:

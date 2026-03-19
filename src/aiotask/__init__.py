@@ -1,16 +1,15 @@
 import asyncio
 import functools
-import inspect
 import threading
 import time
 import weakref
-from collections.abc import AsyncGenerator, Awaitable, Callable, Coroutine
+from collections.abc import AsyncGenerator, Callable, Coroutine
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Concatenate, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 if TYPE_CHECKING:
     from aiotask._graph import TaskGraph
@@ -335,69 +334,6 @@ def track[**P, R](
 
     return wrapper
 
-
-def wait_for[**P, R](
-    func: Callable[P, Coroutine[Any, Any, R]],
-    *to_await: Awaitable,
-    track: bool = False,
-    start: bool = False,
-) -> Callable[P, Coroutine[Any, Any, R]]:
-    """Wait for awaitables (e.g. other tasks) and then run the function.
-
-    You can choose to track setting `track=True` and to start before running the wrapped
-    function setting `start=True`. Notice that if you are chaining multiple `wait_for` or
-    `inject` you should start only on the first wrap and track only on the last wrap.
-    For example:
-    `task = asyncio.create_task(
-        wait_for(inject(my_func, dep, start=True), *awaitables, track=True)(*other_args)`
-    """
-
-    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        if track:
-            await _init_task_info(start=False)
-        if to_await:
-            try:
-                await asyncio.gather(*to_await)
-            except Exception as e:
-                msg = "Failed while waiting to start."
-                raise RuntimeError(msg) from e
-        if start:
-            await _start_task()
-        return await func(*args, **kwargs)
-
-    return wrapper
-
-
-def inject[**P, T, R](
-    func: Callable[Concatenate[T, P], Coroutine[Any, Any, R]],
-    dep: Awaitable[T] | T,
-    track: bool = False,
-    start: bool = False,
-) -> Callable[P, Coroutine[Any, Any, R]]:
-    """Inject awaitables (e.g. other tasks) or simple variables and then run the function.
-
-    You can choose to track setting `track=True` and to start before running the wrapped
-    function setting `start=True`. Notice that if you are chaining multiple `wait_for` or
-    `inject` you should start only on the first wrap and track only on the last wrap.
-    For example:
-    `task = asyncio.create_task(
-        wait_for(inject(my_func, dep, start=True), *awaitables, track=True)(*other_args)`
-    """
-
-    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        if track:
-            await _init_task_info(start=False)
-        try:
-            var = cast("T", await dep) if inspect.isawaitable(dep) else dep
-        except Exception as e:
-            first_param = next(iter(inspect.signature(func).parameters.values()))
-            msg = f"Failed while waiting for injected variable '{first_param}'."
-            raise RuntimeError(msg) from e
-        if start:
-            await _start_task()
-        return await func(var, *args, **kwargs)
-
-    return wrapper  # ty:ignore[invalid-return-type]
 
 
 def make_async[**P, T](

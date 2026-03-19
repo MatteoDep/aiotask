@@ -9,14 +9,12 @@ from aiotask import (
     TaskStatus,
     get_node,
     get_node_id,
-    inject,
     log,
     make_async,
     make_async_generator,
     node,
     remove_node,
     track,
-    wait_for,
 )
 
 
@@ -389,119 +387,6 @@ class TestLog:
 
 
 # ---------------------------------------------------------------------------
-# wait_for
-# ---------------------------------------------------------------------------
-
-
-class TestWaitFor:
-    async def test_waits_before_running(self) -> None:
-        order: list[str] = []
-
-        async def dependency() -> None:
-            await asyncio.sleep(0)
-            order.append("dep")
-
-        async def coro() -> None:
-            order.append("coro")
-
-        dep_task = asyncio.create_task(dependency())
-        wrapped = wait_for(coro, dep_task)
-        await asyncio.create_task(wrapped())
-        assert order == ["dep", "coro"]
-
-    async def test_wait_for_with_track_and_start(self) -> None:
-        seen: list[TaskStatus] = []
-
-        async def dependency() -> None:
-            await asyncio.sleep(0)
-
-        async def coro() -> None:
-            task_id = await get_node_id(_current_task())
-            info = get_node(task_id)
-            seen.append(info.status)
-
-        dep_task = asyncio.create_task(dependency())
-        wrapped = wait_for(coro, dep_task, track=True, start=True)
-        await asyncio.create_task(wrapped())
-        assert seen == [TaskStatus.RUNNING]
-
-    async def test_wait_for_raises_on_failed_dependency(self) -> None:
-        async def bad_dep() -> None:
-            raise RuntimeError("dep failed")
-
-        async def coro() -> None:
-            pass
-
-        dep_task = asyncio.create_task(bad_dep())
-        wrapped = wait_for(coro, dep_task)
-        with pytest.raises(RuntimeError, match="Failed while waiting to start"):
-            await asyncio.create_task(wrapped())
-
-
-# ---------------------------------------------------------------------------
-# inject
-# ---------------------------------------------------------------------------
-
-
-class TestInject:
-    async def test_inject_awaitable_passes_result_as_first_arg(self) -> None:
-        received: list[str] = []
-
-        async def coro(value: str) -> None:
-            received.append(value)
-
-        future: asyncio.Future[str] = asyncio.get_event_loop().create_future()
-        future.set_result("injected_value")
-
-        wrapped = inject(coro, future)
-        await asyncio.create_task(wrapped())  # ty: ignore[missing-argument]
-        assert received == ["injected_value"]
-
-    async def test_inject_plain_value_passes_it_directly(self) -> None:
-        received: list[int] = []
-
-        async def coro(value: int) -> None:
-            received.append(value)
-
-        wrapped = inject(coro, 99)
-        await asyncio.create_task(wrapped())  # ty: ignore[missing-argument]
-        assert received == [99]
-
-    async def test_inject_with_extra_args(self) -> None:
-        received: list[tuple] = []
-
-        async def coro(first: str, second: int, *, kw: str) -> None:
-            received.append((first, second, kw))
-
-        wrapped = inject(coro, "hello")
-        await asyncio.create_task(wrapped(42, kw="world"))
-        assert received == [("hello", 42, "world")]
-
-    async def test_inject_raises_on_failed_awaitable(self) -> None:
-        async def bad_dep() -> str:
-            raise ValueError("dep error")
-
-        async def coro(value: str) -> None:
-            pass
-
-        wrapped = inject(coro, bad_dep())
-        with pytest.raises(RuntimeError, match="Failed while waiting for injected variable"):
-            await asyncio.create_task(wrapped())  # ty: ignore[missing-argument]
-
-    async def test_inject_with_track_and_start(self) -> None:
-        seen: list[TaskStatus] = []
-
-        async def coro(value: int) -> None:
-            task_id = await get_node_id(_current_task())
-            info = get_node(task_id)
-            seen.append(info.status)
-
-        wrapped = inject(coro, 1, track=True, start=True)
-        await asyncio.create_task(wrapped())  # ty: ignore[missing-argument]
-        assert seen == [TaskStatus.RUNNING]
-
-
-# ---------------------------------------------------------------------------
 # make_async
 # ---------------------------------------------------------------------------
 
@@ -812,7 +697,7 @@ class TestDepEdges:
         async def run() -> None:
             async with asyncio.TaskGroup() as tg:
                 up = tg.create_task(node(upstream_fn)(), name="upstream")
-                down = tg.create_task(node(downstream_fn, deps=[up])(up), name="downstream")  # type: ignore[arg-type]
+                down = tg.create_task(node(downstream_fn, deps=[up])(up), name="downstream")
 
                 # Capture ids after both tasks complete
                 async def capture() -> None:
@@ -880,8 +765,6 @@ class TestDepEdges:
 class TestTaskGraph:
     async def test_graph_nodes_includes_all_children(self) -> None:
         from aiotask import TaskGraph
-
-        child_ids: list[int] = []
 
         async def child_fn() -> None:
             await asyncio.sleep(0)
