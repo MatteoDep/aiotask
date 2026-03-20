@@ -131,8 +131,76 @@ def _render_tree(graph: TaskGraph, config: RenderConfig, use_color: bool) -> lis
     return lines
 
 
-def _render_dag(graph: TaskGraph, config: RenderConfig, use_color: bool) -> list[str]:
-    """Render as a flat dependency DAG in topological order."""
+def _fmt_dag_label(
+    info: TaskInfo,
+    use_color: bool,
+    config: RenderConfig,
+) -> str:
+    status_text = _STATUS_LABEL.get(info.status, info.status.value)
+    status_str = f"[{status_text}]"
+    if use_color:
+        status_str = _ansi(status_str, _STATUS_COLOR.get(info.status, "0"))
+    bar = _progress_bar(
+        info.completed, info.total, config.bar_width, config.bar_filled, config.bar_empty,
+    )
+    if use_color:
+        bar = _ansi(bar, "34")
+    total_str = str(int(info.total)) if info.total is not None else "?"
+    progress = f"({int(info.completed)}/{total_str})"
+    dur = _fmt_duration(info)
+    return f"{info.description}  {status_str}  {bar}  {progress}  {dur}"
+
+
+def _render_dag_asciidag(graph: TaskGraph, config: RenderConfig, use_color: bool) -> list[str]:
+    """Render as a visual DAG using asciidag (actual branch/merge lines)."""
+    import io as _io
+
+    from asciidag.graph import Graph as AsciiGraph
+    from asciidag.node import Node as AsciiNode
+
+    nodes = graph.nodes()
+    if not nodes:
+        return []
+
+    node_map: dict[int, TaskInfo] = {n.id: n for n in nodes}
+    root_id = graph.root_id
+
+    # Build asciidag Node objects. "parents" in asciidag = dependents in our DAG
+    # (reversed edges so the graph flows root→leaf top-to-bottom).
+    ascii_nodes: dict[int, AsciiNode] = {}
+
+    # First pass: create all nodes without parents
+    for info in nodes:
+        if info.id == root_id:
+            continue
+        label = _fmt_dag_label(info, use_color, config)
+        ascii_nodes[info.id] = AsciiNode(label)
+
+    # Second pass: wire up parents (= dependents, filtered to non-root nodes in graph)
+    for info in nodes:
+        if info.id == root_id:
+            continue
+        dependents_in_graph = [
+            d for d in info.dependents
+            if d != root_id and d in ascii_nodes
+        ]
+        # Sort dependents by depth (shallowest first) for consistent column layout
+        dependents_in_graph.sort(key=lambda d: (node_map[d].depth, d))
+        ascii_nodes[info.id].parents = [ascii_nodes[d] for d in dependents_in_graph]
+
+    # Display order: topological (depth ASC), which is the order from graph.nodes()
+    display_order = [ascii_nodes[info.id] for info in nodes if info.id != root_id and info.id in ascii_nodes]
+
+    buf = _io.StringIO()
+    g = AsciiGraph(fh=buf, use_color=False)
+    g.show_nodes(display_order)
+    output = buf.getvalue()
+    # Strip trailing newline, split into lines
+    return output.rstrip("\n").split("\n") if output.strip() else []
+
+
+def _render_dag_fallback(graph: TaskGraph, config: RenderConfig, use_color: bool) -> list[str]:
+    """Fallback DAG renderer: flat topological list with indent by depth (when asciidag is not installed)."""
     nodes = graph.nodes()  # already sorted by (depth, id)
     if not nodes:
         return []
@@ -141,6 +209,14 @@ def _render_dag(graph: TaskGraph, config: RenderConfig, use_color: bool) -> list
         indent = "  " * n.depth
         lines.append(_fmt_node(n, graph, prefix=indent, use_color=use_color, config=config))
     return lines
+
+
+def _render_dag(graph: TaskGraph, config: RenderConfig, use_color: bool) -> list[str]:
+    """Render as a visual DAG. Uses asciidag if available, falls back to tree connectors."""
+    try:
+        return _render_dag_asciidag(graph, config, use_color)
+    except ImportError:
+        return _render_dag_fallback(graph, config, use_color)
 
 
 def render_text(graph: TaskGraph, config: RenderConfig | None = None) -> str:

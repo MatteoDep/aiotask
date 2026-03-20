@@ -15,6 +15,7 @@ dev = [
     { name = "ty" },
 ]
 viz = [
+    { name = "asciidag" },
     { name = "rich" },
 ]
 
@@ -27,7 +28,19 @@ dev = [
     { name = "ruff", specifier = ">=0.15.4" },
     { name = "ty", specifier = ">=0.0.19" },
 ]
-viz = [{ name = "rich", specifier = ">=13.0" }]
+viz = [
+    { name = "asciidag", specifier = ">=0.2.0" },
+    { name = "rich", specifier = ">=13.0" },
+]
+
+[[package]]
+name = "asciidag"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/87/7a/2241c6cc1cd1c34b10ba8ced7cd4b9b47c6609fcb186f4bf2826a2f0b43c/asciidag-0.2.0.tar.gz", hash = "sha256:acf4df123fc222322467d9bdb2020e44b4e1af37d38129092a080c3cda54a788", size = 133380, upload-time = "2020-10-05T21:27:22.922Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/10/9b/00885406d04e6bcad4c51a5bff2a92b6d73ef322d8b30916fe3d28bb2c48/asciidag-0.2.0-py2.py3-none-any.whl", hash = "sha256:f7ea1e6a867ab4c3a2537ff03bc0f25d8fccc2d5109f9f329220ba4fbb1b3e02", size = 20138, upload-time = "2020-10-05T21:27:20.374Z" },
+]
 
 [[package]]
 name = "colorama"

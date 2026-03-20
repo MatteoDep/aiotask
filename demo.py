@@ -93,10 +93,10 @@ async def run_pipeline() -> tuple[asyncio.Task, aiotask.TaskGraph]:
 
 async def main() -> None:
     # Post-run: tree view (default)
-    print("\n── Tree view ───────────────────────────")
-    root, graph = await run_pipeline()
-    await aiotask.watch(graph, interval=0.3)
-    await root
+    # print("\n── Tree view ───────────────────────────")
+    # root, graph = await run_pipeline()
+    # await aiotask.watch(graph, interval=0.3)
+    # await root
 
     # Post-run: DAG view
     print("\n── DAG view ────────────────────────────")
