@@ -48,7 +48,7 @@ def _dag_order(graph: TaskGraph, nodes: list[TaskInfo]) -> list[tuple[str, TaskI
         info = node_map[nid]
         deps = eff_deps(nid)
         non_primary = [d for d in deps if d != primary.get(nid)]
-        names = [node_map[d].description for d in non_primary]
+        names = [node_map[d].name for d in non_primary]
         extra = f"  ← {', '.join(names)}" if names else ""
         result.append((connector, info, extra))
         kids = tree_kids.get(nid, [])
@@ -143,7 +143,7 @@ def _render_rich_table(graph: TaskGraph, config: RenderConfig) -> str:
         duration = _fmt_duration(info)
 
         table.add_row(
-            f"{prefix}{info.description}{extra}",
+            f"{prefix}{info.name}{extra}",
             f"[{style}]{info.status.value}[/{style}]",
             progress,
             duration,

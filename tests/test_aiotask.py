@@ -9,7 +9,7 @@ import pytest
 
 from aiotask import (
     TaskStatus,
-    get_task,
+    get_task_info,
     get_task_id,
     log,
     make_async,
@@ -49,9 +49,9 @@ class TestTaskInfoImmutability:
 
         async def coro() -> None:
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             with pytest.raises(RuntimeError, match="allow_edit"):
-                info.description = "new description"
+                info.name = "new name"
 
         await asyncio.create_task(node(coro)())
 
@@ -60,10 +60,10 @@ class TestTaskInfoImmutability:
 
         async def coro() -> None:
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             async with info.allow_edit():
-                info.description = "updated"
-            assert info.description == "updated"
+                info.name = "updated"
+            assert info.name == "updated"
 
         await asyncio.create_task(node(coro)())
 
@@ -72,7 +72,7 @@ class TestTaskInfoImmutability:
 
         async def coro() -> None:
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             # Should not raise
             info._edit_allowed = info._edit_allowed
 
@@ -94,7 +94,7 @@ class TestTaskInfoMethods:
         info = TaskInfo(
             id=999,
             task=task,
-            description="tmp",
+            name="tmp",
             parent=None,
             subtasks=[],
             running_subtasks=[],
@@ -111,7 +111,7 @@ class TestTaskInfoMethods:
     async def test_started_true_after_setting_started_at(self) -> None:
         async def coro() -> None:
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             # node sets start=True after resolving deps
             assert info.started() is True
 
@@ -120,7 +120,7 @@ class TestTaskInfoMethods:
     async def test_done_false_while_running(self) -> None:
         async def coro() -> None:
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             assert info.done() is False
 
         await asyncio.create_task(node(coro)())
@@ -134,7 +134,7 @@ class TestTaskInfoMethods:
         await _flush()
 
         task_id = await get_task_id(task)
-        info = get_task(task_id)
+        info = get_task_info(task_id)
         assert info.done() is True
 
     async def test_duration_zero_before_start(self) -> None:
@@ -144,7 +144,7 @@ class TestTaskInfoMethods:
         info = TaskInfo(
             id=998,
             task=task,
-            description="tmp",
+            name="tmp",
             parent=None,
             subtasks=[],
             running_subtasks=[],
@@ -161,7 +161,7 @@ class TestTaskInfoMethods:
         async def coro() -> None:
             await asyncio.sleep(0.01)
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             assert info.duration() > 0.0
 
         await asyncio.create_task(node(coro)())
@@ -175,7 +175,7 @@ class TestTaskInfoMethods:
         await _flush()
 
         task_id = await get_task_id(task)
-        info = get_task(task_id)
+        info = get_task_info(task_id)
         d1 = info.duration()
         await asyncio.sleep(0.01)
         d2 = info.duration()
@@ -188,19 +188,10 @@ class TestTaskInfoMethods:
 
 
 class TestTaskInfoUpdate:
-    async def test_update_description(self) -> None:
-        async def coro() -> None:
-            task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
-            await info.update(description="new label")
-            assert info.description == "new label"
-
-        await asyncio.create_task(node(coro)())
-
     async def test_update_completed(self) -> None:
         async def coro() -> None:
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             await info.update(completed=5)
             assert info.completed == 5
 
@@ -209,7 +200,7 @@ class TestTaskInfoUpdate:
     async def test_update_total(self) -> None:
         async def coro() -> None:
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             await info.update(total=10)
             assert info.total == 10
 
@@ -218,9 +209,8 @@ class TestTaskInfoUpdate:
     async def test_update_multiple_fields(self) -> None:
         async def coro() -> None:
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
-            await info.update(description="step 3", completed=3, total=10)
-            assert info.description == "step 3"
+            info = get_task_info(task_id)
+            await info.update(completed=3, total=10)
             assert info.completed == 3
             assert info.total == 10
 
@@ -229,24 +219,12 @@ class TestTaskInfoUpdate:
     async def test_update_total_none(self) -> None:
         async def coro() -> None:
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             await info.update(total=5)
             await info.update(total=None)
             assert info.total is None
 
         await asyncio.create_task(node(coro)())
-
-    async def test_update_unset_fields_unchanged(self) -> None:
-        async def coro() -> None:
-            task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
-            original_description = info.description
-            await info.update(completed=7)
-            assert info.description == original_description
-            assert info.completed == 7
-
-        await asyncio.create_task(node(coro)())
-
 
 # ---------------------------------------------------------------------------
 # node — core tracking behaviour (replaces old TestTrack)
@@ -266,7 +244,7 @@ class TestNodeCore:
 
         async def coro() -> None:
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             seen_status.append(info.status)
 
         await asyncio.create_task(node(coro)())
@@ -281,7 +259,7 @@ class TestNodeCore:
         await _flush()
 
         task_id = await get_task_id(task)
-        info = get_task(task_id)
+        info = get_task_info(task_id)
         assert info.status == TaskStatus.DONE
 
     async def test_status_failed_on_exception(self) -> None:
@@ -294,7 +272,7 @@ class TestNodeCore:
         await _flush()
 
         task_id = await get_task_id(task)
-        info = get_task(task_id)
+        info = get_task_info(task_id)
         assert info.status == TaskStatus.FAILED
         assert isinstance(info.exception, ValueError)
 
@@ -310,7 +288,7 @@ class TestNodeCore:
         await _flush()
 
         task_id = await get_task_id(task)
-        info = get_task(task_id)
+        info = get_task_info(task_id)
         assert info.status == TaskStatus.CANCELLED
 
     async def test_task_info_has_correct_id(self) -> None:
@@ -349,7 +327,7 @@ class TestNodeCore:
         task = asyncio.create_task(node(coro, wait_for=[future])())
         await asyncio.sleep(0)  # let task initialise
         task_id = await get_task_id(task)
-        info = get_task(task_id)
+        info = get_task_info(task_id)
         assert info.status == TaskStatus.WAITING
 
         future.set_result(None)
@@ -368,7 +346,7 @@ class TestParentChild:
 
         async def child_coro() -> None:
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             child_parent_holder.append(info.parent)
 
         async def parent_coro() -> None:
@@ -390,7 +368,7 @@ class TestParentChild:
             child_task = asyncio.create_task(node(child_coro)())
             await child_task
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             assert child_id_holder[0] in info.subtasks
 
         await asyncio.create_task(node(parent_coro)())
@@ -406,7 +384,7 @@ class TestParentChild:
             await child_task
             await _flush()
 
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             assert info.total == 1
             assert info.completed == 1
 
@@ -420,7 +398,7 @@ class TestParentChild:
             child_task = asyncio.create_task(node(child_coro)())
             await asyncio.sleep(0)  # let child start so it's in running_subtasks
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             text = info.subtasks_info()
             assert isinstance(text, str)
             await child_task
@@ -443,7 +421,7 @@ class TestLog:
         await task
 
         task_id = await get_task_id(task)
-        info = get_task(task_id)
+        info = get_task_info(task_id)
         assert "hello" in info.logs
         assert "world" in info.logs
 
@@ -455,7 +433,7 @@ class TestLog:
         await task
 
         task_id = await get_task_id(task)
-        info = get_task(task_id)
+        info = get_task_info(task_id)
         assert info.logs == "no-newline"
 
 
@@ -570,7 +548,7 @@ class TestGetTaskHelpers:
         await task
 
         task_id = await get_task_id(task)
-        info = get_task(task_id)
+        info = get_task_info(task_id)
         assert info.id == task_id
         assert info.task is task
 
@@ -614,7 +592,7 @@ class TestRemoveTask:
         remove_task(task_id)
 
         with pytest.raises(ValueError, match="No task with id"):
-            get_task(task_id)
+            get_task_info(task_id)
 
     async def test_remove_task_clears_task_id_mapping(self) -> None:
         async def coro() -> None:
@@ -657,7 +635,7 @@ class TestRemoveTask:
 
         for tid in (parent_id, child_id, grandchild_id):
             with pytest.raises(ValueError):
-                get_task(tid)
+                get_task_info(tid)
 
     async def test_remove_child_does_not_affect_parent(self) -> None:
         child_id_holder: list[int] = []
@@ -678,7 +656,7 @@ class TestRemoveTask:
         remove_task(child_id)
 
         # Parent info must still be accessible
-        info = get_task(parent_id)
+        info = get_task_info(parent_id)
         assert info.id == parent_id
 
 
@@ -824,8 +802,8 @@ class TestDepEdges:
         up_id = upstream_ids[0]
         down_id = downstream_ids[0]
 
-        up_info = get_task(up_id)
-        down_info = get_task(down_id)
+        up_info = get_task_info(up_id)
+        down_info = get_task_info(down_id)
 
         assert down_id in up_info.dependents
         assert up_id in down_info.deps
@@ -865,8 +843,8 @@ class TestDepEdges:
         up_id = upstream_ids[0]
         down_id = downstream_ids[0]
 
-        up_info = get_task(up_id)
-        down_info = get_task(down_id)
+        up_info = get_task_info(up_id)
+        down_info = get_task_info(down_id)
 
         assert down_id in up_info.dependents
         assert up_id in down_info.deps
@@ -901,9 +879,9 @@ class TestDepEdges:
         await asyncio.create_task(track(run)())
         await _flush()
 
-        a_info = get_task(a_ids[0])
-        b_info = get_task(b_ids[0])
-        c_info = get_task(c_ids[0])
+        a_info = get_task_info(a_ids[0])
+        b_info = get_task_info(b_ids[0])
+        c_info = get_task_info(c_ids[0])
 
         assert a_info.depth == 0
         assert b_info.depth == 1
@@ -938,7 +916,7 @@ class TestTaskGraph:
         await _flush()
 
         graph = TaskGraph(root_id=root_id)
-        node_names = {n.description for n in graph.nodes()}
+        node_names = {n.name for n in graph.nodes()}
         assert "root" in node_names
         assert "c1" in node_names
         assert "c2" in node_names
@@ -961,8 +939,8 @@ class TestTaskGraph:
         await _flush()
 
         graph = TaskGraph(root_id=root_id)
-        root_names = {n.description for n in graph.roots()}
-        leaf_names = {n.description for n in graph.leaves()}
+        root_names = {n.name for n in graph.roots()}
+        leaf_names = {n.name for n in graph.leaves()}
 
         assert "a" in root_names
         assert "c" in leaf_names
@@ -1025,7 +1003,7 @@ class TestTaskGraph:
 
         graph = TaskGraph.from_task(root_task)
         assert graph.root_id == root_id
-        assert any(n.description == "c1" for n in graph.nodes())
+        assert any(n.name == "c1" for n in graph.nodes())
 
     async def test_graph_repr(self) -> None:
         from aiotask import TaskGraph
@@ -1064,7 +1042,7 @@ class TestNodeOptions:
             await gc_task
             await _flush()
             task_id = await get_task_id(_current_task())
-            info = get_task(task_id)
+            info = get_task_info(task_id)
             # auto_progress=False means this node doesn't auto-count grandchild
             assert info.total is None
 
@@ -1119,10 +1097,10 @@ class TestDiamondDeps:
         await asyncio.create_task(track(run)())
         await _flush()
 
-        a_info = get_task(ids["a"])
-        b_info = get_task(ids["b"])
-        c_info = get_task(ids["c"])
-        d_info = get_task(ids["d"])
+        a_info = get_task_info(ids["a"])
+        b_info = get_task_info(ids["b"])
+        c_info = get_task_info(ids["c"])
+        d_info = get_task_info(ids["d"])
 
         # a is root
         assert a_info.depth == 0

@@ -51,9 +51,9 @@ class TaskGraph:
         return sorted(infos, key=lambda x: (x.depth, x.id))
 
     def node(self, task_id: int) -> TaskInfo:
-        from aiotask import get_task
+        from aiotask import get_task_info
 
-        return get_task(task_id)
+        return get_task_info(task_id)
 
     def roots(self) -> list[TaskInfo]:
         """Nodes with no deps (no upstream edges)."""

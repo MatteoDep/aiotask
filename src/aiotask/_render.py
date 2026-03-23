@@ -98,12 +98,12 @@ def _fmt_node(
     for dep_id in info.deps:
         try:
             dep_info = graph.node(dep_id)
-            dep_names.append(dep_info.description)
+            dep_names.append(dep_info.name)
         except Exception:
             pass
     dep_str = f"  ← deps: {', '.join(dep_names)}" if dep_names else ""
 
-    return f"{prefix}{info.description}  {label}  {bar}  {progress}  {duration}{dep_str}"
+    return f"{prefix}{info.name}  {label}  {bar}  {progress}  {duration}{dep_str}"
 
 
 def _render_tree(graph: TaskGraph, config: RenderConfig, use_color: bool) -> list[str]:
@@ -148,7 +148,7 @@ def _fmt_dag_label(
     total_str = str(int(info.total)) if info.total is not None else "?"
     progress = f"({int(info.completed)}/{total_str})"
     dur = _fmt_duration(info)
-    return f"{info.description}  {status_str}  {bar}  {progress}  {dur}"
+    return f"{info.name}  {status_str}  {bar}  {progress}  {dur}"
 
 
 def _render_dag_asciidag(graph: TaskGraph, config: RenderConfig, use_color: bool) -> list[str]:

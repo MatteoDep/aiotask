@@ -43,7 +43,7 @@ class TaskInfo:
 
     id: int
     task: asyncio.Task
-    description: str
+    name: str
     parent: int | None
     subtasks: list[int]
     running_subtasks: list[int]
@@ -86,14 +86,11 @@ class TaskInfo:
     async def update(
         self,
         *,
-        description: str | _Unset = _UNSET,
         completed: float | _Unset = _UNSET,
         total: float | None | _Unset = _UNSET,
     ) -> None:
         """Update user-facing fields atomically."""
         async with self.allow_edit():
-            if not isinstance(description, _Unset):
-                self.description = description
             if not isinstance(completed, _Unset):
                 self.completed = completed
             if not isinstance(total, _Unset):
@@ -101,14 +98,14 @@ class TaskInfo:
 
     def subtasks_info(
         self,
-        fmt: Callable[[TaskInfo], str] = "- {0.description}: {0.status.value}".format,
+        fmt: Callable[[TaskInfo], str] = "- {0.name}: {0.status.value}".format,
         sep: str = "\n",
         all_subtasks: bool = False,
     ) -> str:
         items: list[str] = []
         for child_id in self.subtasks if all_subtasks else self.running_subtasks:
             try:
-                items.append(fmt(get_task(child_id)))
+                items.append(fmt(get_task_info(child_id)))
             except ValueError:
                 continue
         return sep.join(items)
@@ -242,7 +239,7 @@ async def _init_task_info(start: bool = True, auto_progress: bool = True) -> Non
 
     task_info = TaskInfo(
         id=task_id,
-        description=task_name,
+        name=task_name,
         parent=parent_id,
         subtasks=[],
         started_at=datetime.now() if start else None,
@@ -322,8 +319,8 @@ async def _register_dep(from_id: int, to_id: int) -> None:
     if from_info is None or to_info is None:
         return
     if _would_cycle(state, from_id, to_id):
-        from_desc = from_info.description
-        to_desc = to_info.description
+        from_desc = from_info.name
+        to_desc = to_info.name
         msg = f"Circular dependency detected: {from_desc!r} -> {to_desc!r} would create a cycle."
         raise RuntimeError(msg)
     async with from_info.allow_edit():
@@ -358,7 +355,7 @@ async def get_task_id(task: asyncio.Task, timeout: float = 1) -> int:
         return state.task_ids[task]
 
 
-def get_task(task_id: int) -> TaskInfo:
+def get_task_info(task_id: int) -> TaskInfo:
     """Get the task info from a task_id."""
     loop = asyncio.get_running_loop()
     try:
