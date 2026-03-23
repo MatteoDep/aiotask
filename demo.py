@@ -6,6 +6,7 @@ Features showcased:
   - wait_for=         declare a side-effect dependency without receiving its result
   - TaskInfo.update() report per-chunk progress from inside a coroutine
   - make_async()      wrap a sync function so it can be tracked
+  - subtasks          enrich() fans out into per-chunk node() subtasks
 
 DAG shape:
 
@@ -25,7 +26,6 @@ import asyncio
 
 import aiotask
 
-
 # ── step functions ────────────────────────────────────────────────────────────
 
 async def fetch_data() -> list[int]:
@@ -41,16 +41,30 @@ async def validate(data: list[int]) -> list[int]:
     return valid
 
 
+async def _enrich_chunk(chunk: list[int]) -> list[int]:
+    await asyncio.sleep(0.5)
+    return [x * 10 for x in chunk]
+
+
 async def enrich(data: list[int]) -> list[int]:
-    await asyncio.sleep(2)
-    await aiotask.log("enrichment complete")
-    return [x * 10 for x in data]
+    chunks = [data[i : i + 25] for i in range(0, len(data), 25)]
+    async with asyncio.TaskGroup() as tg:
+        subtasks = [
+            tg.create_task(
+                aiotask.node(_enrich_chunk)(chunk),
+                name=f"enrich-chunk-{i}",
+            )
+            for i, chunk in enumerate(chunks)
+        ]
+    result = [x for t in subtasks for x in t.result()]
+    await aiotask.log(f"enrichment complete: {len(result)} records")
+    return result
 
 
 async def process(data: list[int]) -> list[int]:
     """Process data in chunks, updating progress via TaskInfo.update()."""
     # Retrieve our own TaskInfo so we can push granular progress updates.
-    info = aiotask.get_task_info(await aiotask.get_task_id(asyncio.current_task()))
+    info = aiotask.current_task_info()
 
     chunks = [data[i : i + 10] for i in range(0, len(data), 10)]
     await info.update(total=len(chunks), completed=0)

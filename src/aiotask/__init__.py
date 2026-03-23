@@ -355,6 +355,19 @@ async def get_task_id(task: asyncio.Task, timeout: float = 1) -> int:
         return state.task_ids[task]
 
 
+def current_task_info() -> TaskInfo:
+    """Return the TaskInfo for the currently executing tracked task.
+
+    Raises RuntimeError if called outside a node()-wrapped coroutine.
+    """
+    try:
+        task_id = _task_id.get()
+    except LookupError:
+        msg = "Not inside a tracked task. Call this from within a node()-wrapped coroutine."
+        raise RuntimeError(msg) from None
+    return get_task_info(task_id)
+
+
 def get_task_info(task_id: int) -> TaskInfo:
     """Get the task info from a task_id."""
     loop = asyncio.get_running_loop()
@@ -433,6 +446,7 @@ __all__ = [
     "TaskGraph",
     "TaskInfo",
     "TaskStatus",
+    "current_task_info",
     "get_render",
     "get_task",
     "get_task_id",
