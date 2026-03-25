@@ -123,18 +123,19 @@ def _render_rich_table(graph: TaskGraph, config: RenderConfig) -> str:
         node_map = {n.id: n for n in nodes}
         ordered = []
 
-        def _walk(nid: int, indent: str, connector: str) -> None:
-            info = node_map.get(nid)
-            if info is None:
-                return
-            ordered.append((connector, info, ""))
-            children = [c for c in info.subtasks if c in node_map]
-            for i, cid in enumerate(children):
-                is_last = i == len(children) - 1
-                _walk(cid, indent + ("   " if is_last else "│  "), indent + ("└─ " if is_last else "├─ "))
-
         if graph.root_id in node_map:
-            _walk(graph.root_id, "", "")
+            stack: list[tuple[int, str, str]] = [(graph.root_id, "", "")]
+            while stack:
+                nid, indent, connector = stack.pop()
+                info = node_map.get(nid)
+                if info is None:
+                    continue
+                ordered.append((connector, info, ""))
+                children = [c for c in info.subtasks if c in node_map]
+                for i in range(len(children) - 1, -1, -1):
+                    cid = children[i]
+                    is_last = i == len(children) - 1
+                    stack.append((cid, indent + ("   " if is_last else "│  "), indent + ("└─ " if is_last else "├─ ")))
     else:
         ordered = [("", n, "") for n in nodes]
 

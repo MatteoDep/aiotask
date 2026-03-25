@@ -105,18 +105,19 @@ def _render_tree(graph: TaskGraph, config: RenderConfig, use_color: bool) -> lis
     node_map = {n.id: n for n in nodes}
     lines: list[str] = []
 
-    def walk(nid: int, indent: str, connector: str) -> None:
-        info = node_map.get(nid)
-        if info is None:
-            return
-        lines.append(_fmt_node(info, graph, prefix=connector, use_color=use_color, config=config))
-        children = [c for c in info.subtasks if c in node_map]
-        for i, cid in enumerate(children):
-            is_last = i == len(children) - 1
-            walk(cid, indent + ("   " if is_last else "│  "), indent + ("└─ " if is_last else "├─ "))
-
     if graph.root_id is not None and graph.root_id in node_map:
-        walk(graph.root_id, "", "")
+        stack: list[tuple[int, str, str]] = [(graph.root_id, "", "")]
+        while stack:
+            nid, indent, connector = stack.pop()
+            info = node_map.get(nid)
+            if info is None:
+                continue
+            lines.append(_fmt_node(info, graph, prefix=connector, use_color=use_color, config=config))
+            children = [c for c in info.subtasks if c in node_map]
+            for i in range(len(children) - 1, -1, -1):
+                cid = children[i]
+                is_last = i == len(children) - 1
+                stack.append((cid, indent + ("   " if is_last else "│  "), indent + ("└─ " if is_last else "├─ ")))
     else:
         for n in nodes:
             lines.append(_fmt_node(n, graph, use_color=use_color, config=config))
@@ -237,20 +238,20 @@ def _render_dag_fallback(graph: TaskGraph, config: RenderConfig, use_color: bool
 
     lines: list[str] = []
 
-    def walk(nid: int, indent: str) -> None:
-        info = node_map.get(nid)
-        if info is None:
-            return
-        real_deps = [d for d in info.deps if d != root_id and d in node_map]
-        dep_str = f"  (<- {', '.join(node_map[d].name for d in real_deps)})" if real_deps else ""
-        lines.append(_fmt_node(info, graph, prefix=indent, use_color=use_color, config=config) + dep_str)
-        for kid in tree_kids.get(nid, []):
-            walk(kid, indent + "  ")
-
     if root_id is not None and root_id in node_map:
         lines.append(_fmt_node(node_map[root_id], graph, prefix="", use_color=use_color, config=config))
-    for nid in dag_roots:
-        walk(nid, "")
+    for dag_root in dag_roots:
+        stack: list[tuple[int, str]] = [(dag_root, "")]
+        while stack:
+            nid, indent = stack.pop()
+            info = node_map.get(nid)
+            if info is None:
+                continue
+            real_deps = [d for d in info.deps if d != root_id and d in node_map]
+            dep_str = f"  (<- {', '.join(node_map[d].name for d in real_deps)})" if real_deps else ""
+            lines.append(_fmt_node(info, graph, prefix=indent, use_color=use_color, config=config) + dep_str)
+            for kid in reversed(tree_kids.get(nid, [])):
+                stack.append((kid, indent + "  "))
     return lines
 
 
