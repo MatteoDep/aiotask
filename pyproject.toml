@@ -1,6 +1,6 @@
 [project]
 name = "aionode"
-dynamic = ["version"]
+version = "0.1.0"
 description = "Lightweight asyncio task tracking as call tree and DAG"
 readme = "README.md"
 authors = [
