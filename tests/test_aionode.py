@@ -426,8 +426,8 @@ class TestParentChild:
                 up = tg.create_task(node(upstream_fn)(), name="upstream")
                 tg.create_task(node(parent_fn)(resolve(up)), name="parent")
 
-        from aionode import _task_id, track
-        await asyncio.create_task(track(run)())
+        from aionode import _task_id
+        await asyncio.create_task(node(run)())
         await _flush()
 
         child_info = get_task_info(child_ids[0])
@@ -787,9 +787,8 @@ class TestNode:
                 up = tg.create_task(node(upstream)(), name="up")
                 tg.create_task(node(downstream)(resolve(up)), name="down")
 
-        from aionode import track
 
-        await asyncio.create_task(track(run)())
+        await asyncio.create_task(node(run)())
         await _flush()
 
 
@@ -824,9 +823,8 @@ class TestDepEdges:
 
                 tg.create_task(capture(), name="capture")
 
-        from aionode import track
 
-        await asyncio.create_task(track(run)())
+        await asyncio.create_task(node(run)())
         await _flush()
 
         up_id = upstream_ids[0]
@@ -865,9 +863,9 @@ class TestDepEdges:
 
                 tg.create_task(capture(), name="capture")
 
-        from aionode import track
+        from aionode import node
 
-        await asyncio.create_task(track(run)())
+        await asyncio.create_task(node(run)())
         await _flush()
 
         up_id = upstream_ids[0]
@@ -904,9 +902,9 @@ class TestDepEdges:
 
                 tg.create_task(capture(), name="capture")
 
-        from aionode import track
+        from aionode import node
 
-        await asyncio.create_task(track(run)())
+        await asyncio.create_task(node(run)())
         await _flush()
 
         a_info = get_task_info(a_ids[0])
@@ -935,7 +933,6 @@ class TestNodeOptions:
 
     async def test_node_auto_progress_false(self) -> None:
         """node(fn, auto_progress=False) should not auto-count its own sub-children."""
-        from aionode import track
 
         async def grandchild_fn() -> None:
             pass
@@ -955,7 +952,7 @@ class TestNodeOptions:
             )
             await child_task
 
-        await asyncio.create_task(track(run)())
+        await asyncio.create_task(node(run)())
 
     async def test_node_preserves_function_name(self) -> None:
         """node() wrapper should preserve __name__ via functools.wraps."""
@@ -975,7 +972,6 @@ class TestNodeOptions:
 class TestDiamondDeps:
     async def test_diamond_dependency(self) -> None:
         """A -> B, A -> C, B -> D, C -> D — diamond pattern."""
-        from aionode import track
 
         async def fn() -> None:
             await asyncio.sleep(0)
@@ -997,7 +993,7 @@ class TestDiamondDeps:
 
                 tg.create_task(capture(), name="capture")
 
-        await asyncio.create_task(track(run)())
+        await asyncio.create_task(node(run)())
         await _flush()
 
         a_info = get_task_info(ids["a"])
@@ -1052,7 +1048,7 @@ class TestErrorPropagation:
 class TestCircularDeps:
     async def test_circular_dep_raises(self) -> None:
         """Creating a circular dependency should raise RuntimeError."""
-        from aionode import _register_dep, track
+        from aionode import _register_dep
 
         async def fn() -> None:
             await asyncio.sleep(10)
@@ -1074,7 +1070,7 @@ class TestCircularDeps:
                 b.cancel()
 
         try:
-            await asyncio.create_task(track(run)())
+            await asyncio.create_task(node(run)())
         except BaseException:
             pass
 
@@ -1087,7 +1083,6 @@ class TestCircularDeps:
 class TestWalkTree:
     async def test_walk_tree_dfs_order(self) -> None:
         """Parent appears before its children in DFS pre-order."""
-        from aionode import track
 
         async def child_fn() -> None:
             await asyncio.sleep(0)
@@ -1097,7 +1092,7 @@ class TestWalkTree:
                 tg.create_task(node(child_fn)(), name="c1")
                 tg.create_task(node(child_fn)(), name="c2")
 
-        root_task = asyncio.create_task(track(run)(), name="root")
+        root_task = asyncio.create_task(node(run)(), name="root")
         root_id = await get_task_id(root_task)
         await root_task
         await _flush()
@@ -1111,7 +1106,6 @@ class TestWalkTree:
 
     async def test_walk_tree_respects_subtasks(self) -> None:
         """Enrich chunks appear as children of enrich."""
-        from aionode import track
 
         async def chunk_fn() -> None:
             await asyncio.sleep(0)
@@ -1125,7 +1119,7 @@ class TestWalkTree:
             async with asyncio.TaskGroup() as tg:
                 tg.create_task(node(enrich_fn)(), name="enrich")
 
-        root_task = asyncio.create_task(track(run)(), name="root")
+        root_task = asyncio.create_task(node(run)(), name="root")
         root_id = await get_task_id(root_task)
         await root_task
         await _flush()
@@ -1136,7 +1130,6 @@ class TestWalkTree:
 
     async def test_walk_tree_with_root(self) -> None:
         """Scoped traversal only yields subtree."""
-        from aionode import track
 
         async def fn() -> None:
             await asyncio.sleep(0)
@@ -1154,7 +1147,7 @@ class TestWalkTree:
                 tg.create_task(node(fn)(), name="sibling")
                 tg.create_task(node(branch)(), name="branch")
 
-        root_task = asyncio.create_task(track(run)(), name="root")
+        root_task = asyncio.create_task(node(run)(), name="root")
         await root_task
         await _flush()
 
@@ -1169,7 +1162,6 @@ class TestWalkTree:
 class TestWalkDag:
     async def test_walk_dag_topological_order(self) -> None:
         """Dependencies appear before dependents."""
-        from aionode import track
 
         async def fn() -> None:
             await asyncio.sleep(0)
@@ -1180,7 +1172,7 @@ class TestWalkDag:
                 b = tg.create_task(node(fn, wait_for=[a])(), name="b")
                 tg.create_task(node(fn, wait_for=[b])(), name="c")
 
-        root_task = asyncio.create_task(track(run)(), name="root")
+        root_task = asyncio.create_task(node(run)(), name="root")
         root_id = await get_task_id(root_task)
         await root_task
         await _flush()
@@ -1191,7 +1183,6 @@ class TestWalkDag:
 
     async def test_walk_dag_isolated_nodes_after_parent(self) -> None:
         """Enrich chunks (no DAG deps) appear after their parent in topological order."""
-        from aionode import track
 
         async def chunk_fn() -> None:
             await asyncio.sleep(0)
@@ -1205,7 +1196,7 @@ class TestWalkDag:
             async with asyncio.TaskGroup() as tg:
                 tg.create_task(node(enrich_fn)(), name="enrich")
 
-        root_task = asyncio.create_task(track(run)(), name="root")
+        root_task = asyncio.create_task(node(run)(), name="root")
         root_id = await get_task_id(root_task)
         await root_task
         await _flush()
@@ -1216,7 +1207,6 @@ class TestWalkDag:
 
     async def test_walk_dag_with_root(self) -> None:
         """Scoped traversal only yields subtree."""
-        from aionode import track
 
         async def fn() -> None:
             await asyncio.sleep(0)
@@ -1234,7 +1224,7 @@ class TestWalkDag:
                 tg.create_task(node(fn)(), name="sibling")
                 tg.create_task(node(branch)(), name="branch")
 
-        root_task = asyncio.create_task(track(run)(), name="root")
+        root_task = asyncio.create_task(node(run)(), name="root")
         await root_task
         await _flush()
 
@@ -1246,7 +1236,6 @@ class TestWalkDag:
 
     async def test_walk_tree_and_dag_same_set(self) -> None:
         """Both iterators yield the same tasks, possibly in different order."""
-        from aionode import track
 
         async def fn() -> None:
             await asyncio.sleep(0)
@@ -1256,7 +1245,7 @@ class TestWalkDag:
                 a = tg.create_task(node(fn)(), name="a")
                 tg.create_task(node(fn, wait_for=[a])(), name="b")
 
-        root_task = asyncio.create_task(track(run)(), name="root")
+        root_task = asyncio.create_task(node(run)(), name="root")
         root_id = await get_task_id(root_task)
         await root_task
         await _flush()

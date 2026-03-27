@@ -475,21 +475,6 @@ def remove_task(task_id: int) -> None:
         stack.extend(task_info.subtasks)
 
 
-def track[**P, R](
-    func: Callable[P, Coroutine[Any, Any, R]],
-    start: bool = True,
-) -> Callable[P, Coroutine[Any, Any, R]]:
-    """Track a coroutine by recording task info."""
-
-    @functools.wraps(func)
-    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        await _init_task_info(start=start)
-        return await func(*args, **kwargs)
-
-    return wrapper
-
-
-
 def make_async[**P, T](
     func: Callable[P, T],
 ) -> Callable[P, Coroutine[Any, Any, T]]:
