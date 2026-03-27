@@ -97,8 +97,8 @@ class TestTaskInfoMethods:
             task=task,
             name="tmp",
             parent=None,
-            subtasks=[],
-            running_subtasks=[],
+            subtasks=(),
+            running_subtasks=(),
             status=TaskStatus.WAITING,
         )
         # Override protection so we can leave started_at as None
@@ -146,8 +146,8 @@ class TestTaskInfoMethods:
             task=task,
             name="tmp",
             parent=None,
-            subtasks=[],
-            running_subtasks=[],
+            subtasks=(),
+            running_subtasks=(),
             status=TaskStatus.WAITING,
         )
         assert info.duration() == 0.0
@@ -432,7 +432,7 @@ class TestParentChild:
         child_info = get_task_info(child_ids[0])
         assert child_info.tree_depth == 2  # child is a subtask of parent (tree depth 1), so tree_depth=2
         assert child_info.dag_depth == 0   # child has no dep edges
-        assert child_info.deps == []
+        assert child_info.deps == ()
 
 
 # ---------------------------------------------------------------------------
