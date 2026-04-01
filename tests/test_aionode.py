@@ -34,12 +34,6 @@ def _current_task() -> asyncio.Task[Any]:
 # ---------------------------------------------------------------------------
 
 
-async def _flush() -> None:
-    """Yield control several times so background callback tasks can finish."""
-    for _ in range(3):
-        await asyncio.sleep(0)
-
-
 # ---------------------------------------------------------------------------
 # TaskInfo - immutability guard
 # ---------------------------------------------------------------------------
@@ -132,7 +126,6 @@ class TestTaskInfoMethods:
 
         task = asyncio.create_task(node(coro)())
         await task
-        await _flush()
 
         task_id = await get_task_id(task)
         info = get_task_info(task_id)
@@ -172,7 +165,6 @@ class TestTaskInfoMethods:
 
         task = asyncio.create_task(node(coro)())
         await task
-        await _flush()
 
         task_id = await get_task_id(task)
         info = get_task_info(task_id)
@@ -256,7 +248,6 @@ class TestNodeCore:
 
         task = asyncio.create_task(node(coro)())
         await task
-        await _flush()
 
         task_id = await get_task_id(task)
         info = get_task_info(task_id)
@@ -269,7 +260,6 @@ class TestNodeCore:
         task = asyncio.create_task(node(failing_coro)())
         with pytest.raises(ValueError, match="boom"):
             await task
-        await _flush()
 
         task_id = await get_task_id(task)
         info = get_task_info(task_id)
@@ -285,7 +275,6 @@ class TestNodeCore:
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
-        await _flush()
 
         task_id = await get_task_id(task)
         info = get_task_info(task_id)
@@ -382,7 +371,6 @@ class TestParentChild:
 
             child_task = asyncio.create_task(node(child_coro)())
             await child_task
-            await _flush()
 
             info = get_task_info(task_id)
             assert info.total == 1
@@ -427,7 +415,6 @@ class TestParentChild:
                 tg.create_task(node(parent_fn)(resolve(up)), name="parent")
 
         await asyncio.create_task(node(run)())
-        await _flush()
 
         child_info = get_task_info(child_ids[0])
         assert child_info.tree_depth == 2  # child is a subtask of parent (tree depth 1), so tree_depth=2
@@ -615,7 +602,6 @@ class TestRemoveTask:
 
         task = asyncio.create_task(node(coro)())
         await task
-        await _flush()
 
         task_id = await get_task_id(task)
         remove_task(task_id)
@@ -629,7 +615,6 @@ class TestRemoveTask:
 
         task = asyncio.create_task(node(coro)())
         await task
-        await _flush()
 
         task_id = await get_task_id(task)
         remove_task(task_id)
@@ -654,7 +639,6 @@ class TestRemoveTask:
 
         task = asyncio.create_task(node(parent_coro)())
         await task
-        await _flush()
 
         parent_id = await get_task_id(task)
         child_id = child_id_holder[0]
@@ -677,7 +661,6 @@ class TestRemoveTask:
 
         task = asyncio.create_task(node(parent_coro)())
         await task
-        await _flush()
 
         parent_id = await get_task_id(task)
         child_id = child_id_holder[0]
@@ -788,7 +771,6 @@ class TestNode:
 
 
         await asyncio.create_task(node(run)())
-        await _flush()
 
 
 # ---------------------------------------------------------------------------
@@ -824,7 +806,6 @@ class TestDepEdges:
 
 
         await asyncio.create_task(node(run)())
-        await _flush()
 
         up_id = upstream_ids[0]
         down_id = downstream_ids[0]
@@ -863,7 +844,6 @@ class TestDepEdges:
                 tg.create_task(capture(), name="capture")
 
         await asyncio.create_task(node(run)())
-        await _flush()
 
         up_id = upstream_ids[0]
         down_id = downstream_ids[0]
@@ -900,7 +880,6 @@ class TestDepEdges:
                 tg.create_task(capture(), name="capture")
 
         await asyncio.create_task(node(run)())
-        await _flush()
 
         a_info = get_task_info(a_ids[0])
         b_info = get_task_info(b_ids[0])
@@ -935,7 +914,6 @@ class TestNodeOptions:
         async def child_fn() -> None:
             gc_task = asyncio.create_task(node(grandchild_fn)(), name="grandchild")
             await gc_task
-            await _flush()
             task_id = await get_task_id(_current_task())
             info = get_task_info(task_id)
             # auto_progress=False means this node doesn't auto-count grandchild
@@ -989,7 +967,6 @@ class TestDiamondDeps:
                 tg.create_task(capture(), name="capture")
 
         await asyncio.create_task(node(run)())
-        await _flush()
 
         a_info = get_task_info(ids["a"])
         b_info = get_task_info(ids["b"])
@@ -1052,7 +1029,6 @@ class TestCircularDeps:
             async with asyncio.TaskGroup() as tg:
                 a = tg.create_task(node(fn)(), name="a")
                 b = tg.create_task(node(fn, wait_for=[a])(), name="b")
-                await _flush()
 
                 a_id = await get_task_id(a)
                 b_id = await get_task_id(b)
@@ -1090,7 +1066,6 @@ class TestWalkTree:
         root_task = asyncio.create_task(node(run)(), name="root")
         root_id = await get_task_id(root_task)
         await root_task
-        await _flush()
 
         names = [info.name for info in walk_tree(root_id)]
         assert names[0] == "root"
@@ -1117,7 +1092,6 @@ class TestWalkTree:
         root_task = asyncio.create_task(node(run)(), name="root")
         root_id = await get_task_id(root_task)
         await root_task
-        await _flush()
 
         names = [info.name for info in walk_tree(root_id)]
         assert names.index("enrich") < names.index("chunk-0")
@@ -1144,7 +1118,6 @@ class TestWalkTree:
 
         root_task = asyncio.create_task(node(run)(), name="root")
         await root_task
-        await _flush()
 
         assert subtree_id is not None
         names = {info.name for info in walk_tree(subtree_id)}
@@ -1170,7 +1143,6 @@ class TestWalkDag:
         root_task = asyncio.create_task(node(run)(), name="root")
         root_id = await get_task_id(root_task)
         await root_task
-        await _flush()
 
         names = [info.name for info in walk_dag(root_id)]
         assert names.index("a") < names.index("b")
@@ -1194,7 +1166,6 @@ class TestWalkDag:
         root_task = asyncio.create_task(node(run)(), name="root")
         root_id = await get_task_id(root_task)
         await root_task
-        await _flush()
 
         names = [info.name for info in walk_dag(root_id)]
         assert names.index("enrich") < names.index("chunk-0")
@@ -1221,7 +1192,6 @@ class TestWalkDag:
 
         root_task = asyncio.create_task(node(run)(), name="root")
         await root_task
-        await _flush()
 
         assert subtree_id is not None
         names = {info.name for info in walk_dag(subtree_id)}
@@ -1243,7 +1213,6 @@ class TestWalkDag:
         root_task = asyncio.create_task(node(run)(), name="root")
         root_id = await get_task_id(root_task)
         await root_task
-        await _flush()
 
         tree_ids = {info.id for info in walk_tree(root_id)}
         dag_ids = {info.id for info in walk_dag(root_id)}

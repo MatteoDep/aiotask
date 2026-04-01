@@ -6,7 +6,7 @@ import threading
 import time
 import weakref
 from collections.abc import AsyncGenerator, Awaitable, Callable, Coroutine, Iterator, Sequence
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -87,8 +87,17 @@ def node[**P, R](
 
         await _start()
 
-        result = func(*resolved_args, **resolved_kwargs)
-        return await result if inspect.isawaitable(result) else result
+        try:
+            result = func(*resolved_args, **resolved_kwargs)
+            retval = await result if inspect.isawaitable(result) else result
+        except BaseException as exc:
+            if track:
+                _mark_done(_task_id.get(), exc, _get_state())
+            raise
+        else:
+            if track:
+                _mark_done(_task_id.get(), None, _get_state())
+        return retval
 
     return wrapper
 
@@ -148,6 +157,14 @@ class TaskInfo:
 
         object.__setattr__(self, name, value)
 
+    @contextmanager
+    def edit(self) -> Iterator[None]:
+        self._edit_allowed = True
+        try:
+            yield
+        finally:
+            self._edit_allowed = False
+
     @asynccontextmanager
     async def allow_edit(self) -> AsyncGenerator[None]:
         async with self._lock:
@@ -205,7 +222,6 @@ _task_id: ContextVar[int] = ContextVar("task_id")
 class _LoopState:
     task_infos: dict[int, "TaskInfo"] = field(default_factory=dict)
     task_ids: dict[asyncio.Task, int] = field(default_factory=dict)
-    background_tasks: set[asyncio.Task] = field(default_factory=set)
     _next_id: int = field(default=0)
     _id_lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -229,15 +245,19 @@ def _get_state() -> _LoopState:
         return state
 
 
-async def _set_done(task_id: int) -> None:
-    state = _get_state()
+def _mark_done(task_id: int, exc: BaseException | None, state: _LoopState) -> None:
+    """Synchronously update TaskInfo when a tracked task finishes.
+
+    Called from within the wrapper coroutine (via try/except), so no event-loop
+    concurrency can interleave here — bypassing the async lock is safe.
+    """
     task_info = state.task_infos[task_id]
-    async with task_info.allow_edit():
+    with task_info.edit():
         task_info._finish_mono = time.monotonic()
         task_info.finished_at = datetime.now()
-        if task_info.task.cancelled():
+        if isinstance(exc, asyncio.CancelledError):
             task_info.status = TaskStatus.CANCELLED
-        elif exc := task_info.task.exception():
+        elif exc is not None:
             task_info.status = TaskStatus.FAILED
             task_info.exception = exc
         else:
@@ -246,43 +266,15 @@ async def _set_done(task_id: int) -> None:
             task_info.total = 1
             task_info.completed = 1
 
-
-async def _update_parent(task_id: int, parent_id: int, auto_progress: bool) -> None:
-    state = _get_state()
-    parent_task_info = state.task_infos[parent_id]
-    async with parent_task_info.allow_edit():
-        if auto_progress:
-            parent_task_info.completed = (parent_task_info.completed or 0) + 1
-        if task_id in parent_task_info.running_subtasks:
-            parent_task_info.running_subtasks = tuple(
-                tid for tid in parent_task_info.running_subtasks if tid != task_id
-            )
-
-
-def _add_done_callback(task: asyncio.Task, task_id: int, state: _LoopState) -> None:
-    def callback(_: asyncio.Task) -> None:
-        callback_task = asyncio.create_task(_set_done(task_id=task_id))
-        state.background_tasks.add(callback_task)
-        callback_task.add_done_callback(state.background_tasks.discard)
-
-    task.add_done_callback(callback)
-
-
-def _add_update_parent_callback(
-    task: asyncio.Task,
-    task_id: int,
-    parent_id: int,
-    auto_progress: bool,
-    state: _LoopState,
-) -> None:
-    def callback(_: asyncio.Task) -> None:
-        callback_task = asyncio.create_task(
-            _update_parent(task_id=task_id, parent_id=parent_id, auto_progress=auto_progress)
-        )
-        state.background_tasks.add(callback_task)
-        callback_task.add_done_callback(state.background_tasks.discard)
-
-    task.add_done_callback(callback)
+    if task_info.parent is not None:
+        parent_info = state.task_infos[task_info.parent]
+        with parent_info.edit():
+            if task_info.auto_progress:
+                parent_info.completed = (parent_info.completed or 0) + 1
+            if task_id in parent_info.running_subtasks:
+                parent_info.running_subtasks = tuple(
+                    tid for tid in parent_info.running_subtasks if tid != task_id
+                )
 
 
 def _get_task() -> asyncio.Task:
@@ -330,20 +322,12 @@ async def _init_task_info(start: bool = True, auto_progress: bool = True) -> Non
 
     async with task_info.allow_edit():
         state.task_infos[task_id] = task_info
-        _add_done_callback(task, task_id=task_id, state=state)
         if parent_id is not None:
             parent_task_info = state.task_infos[parent_id]
             async with parent_task_info.allow_edit():
                 parent_task_info.subtasks = (*parent_task_info.subtasks, task_id)
                 if start:
                     parent_task_info.running_subtasks = (*parent_task_info.running_subtasks, task_id)
-                _add_update_parent_callback(
-                    task,
-                    task_id=task_id,
-                    parent_id=parent_id,
-                    auto_progress=parent_task_info.auto_progress,
-                    state=state,
-                )
                 if parent_task_info.auto_progress:
                     total = parent_task_info.total or 0
                     parent_task_info.total = total + 1
@@ -454,6 +438,7 @@ def get_task_info(task_id: int) -> TaskInfo:
     except KeyError:
         msg = f"No task with id {task_id!r} found in the current event loop."
         raise ValueError(msg) from None
+
 
 
 def remove_task(task_id: int) -> None:

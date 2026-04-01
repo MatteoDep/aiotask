@@ -188,10 +188,6 @@ async def main() -> None:
     root_id = await aionode.get_task_id(root)
     await root
 
-    # Let done-callbacks finish
-    for _ in range(5):
-        await asyncio.sleep(0)
-
     print("\n── Tree view ───────────────────────────")
     print_tree(root_id)
 
